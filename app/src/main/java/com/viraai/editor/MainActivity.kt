@@ -2,6 +2,9 @@ package com.viraai.editor
 
 import android.app.Activity
 import android.os.Bundle
+import android.net.Uri
+import android.content.Intent
+import android.provider.OpenableColumns
 import android.graphics.Color
 import android.view.Gravity
 import android.view.ViewGroup
@@ -9,109 +12,97 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import android.content.Intent
-import android.net.Uri
 
 class MainActivity : Activity() {
 
+    private lateinit var statusText: TextView
+    private var selectedVideoUri: Uri? = null
     private val pickVideoCode = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.rgb(15, 17, 30)
-        window.navigationBarColor = Color.rgb(15, 17, 30)
+        window.statusBarColor = Color.rgb(15, 15, 25)
+        window.navigationBarColor = Color.rgb(15, 15, 25)
 
-        val root = LinearLayout(this)
-        root.orientation = LinearLayout.VERTICAL
-        root.gravity = Gravity.CENTER
-        root.setPadding(28, 32, 28, 32)
-        root.setBackgroundColor(Color.rgb(15, 17, 30))
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(24, 35, 24, 24)
+            setBackgroundColor(Color.rgb(15, 15, 25))
+        }
 
-        val title = TextView(this)
-        title.text = "ViraAI"
-        title.textSize = 36f
-        title.setTextColor(Color.WHITE)
-        title.gravity = Gravity.CENTER
+        val title = TextView(this).apply {
+            text = "ViraAI"
+            textSize = 34f
+            setTextColor(Color.rgb(125, 100, 255))
+            gravity = Gravity.CENTER
+        }
 
-        val subtitle = TextView(this)
-        subtitle.text = "دستیار هوشمند تدوین ویدیو"
-        subtitle.textSize = 17f
-        subtitle.setTextColor(Color.LTGRAY)
-        subtitle.gravity = Gravity.CENTER
-        subtitle.setPadding(0, 12, 0, 36)
+        val subtitle = TextView(this).apply {
+            text = "دستیار هوشمند تدوین ویدیو"
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        }
 
-        root.addView(
-            title,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
+        statusText = TextView(this).apply {
+            text = "هنوز ویدیویی انتخاب نکرده‌ای."
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(12, 25, 12, 25)
+        }
 
-        root.addView(
-            subtitle,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
+        root.addView(title)
+        root.addView(subtitle)
 
-        addButton(root, "🎬 انتخاب ویدیو") {
+        root.addView(makeButton("🎬 انتخاب ویدیو") {
             selectVideo()
-        }
+        })
 
-        addButton(root, "✂️ ابزارهای تدوین") {
-            Toast.makeText(
-                this,
-                "ابزارهای تدوین در نسخه‌های بعدی اضافه می‌شوند.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+        root.addView(makeButton("✍️ زیرنویس خودکار") {
+            if (selectedVideoUri == null) {
+                showMessage("ابتدا یک ویدیو انتخاب کن.")
+            } else {
+                showMessage(
+                    "ویدیو انتخاب شده؛ قابلیت زیرنویس خودکار را در مرحله بعد اضافه می‌کنیم."
+                )
+            }
+        })
 
-        addButton(root, "📝 زیرنویس خودکار") {
-            Toast.makeText(
-                this,
-                "قابلیت زیرنویس در حال آماده‌سازی است.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+        root.addView(makeButton("🤖 ادیت هوشمند") {
+            if (selectedVideoUri == null) {
+                showMessage("ابتدا یک ویدیو انتخاب کن.")
+            } else {
+                showMessage(
+                    "ویدیو آماده است؛ قابلیت ادیت هوشمند را در مرحله بعد اضافه می‌کنیم."
+                )
+            }
+        })
 
-        addButton(root, "🤖 تدوین هوشمند") {
-            Toast.makeText(
-                this,
-                "قابلیت هوش مصنوعی در مراحل بعدی اضافه می‌شود.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+        root.addView(makeButton("📁 پروژه‌های من") {
+            showMessage(
+                "قابلیت ذخیره و مدیریت پروژه‌ها را در مرحله بعد اضافه می‌کنیم."
+            )
+        })
+
+        root.addView(
+            statusText,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         setContentView(root)
     }
 
-    private fun addButton(
-        root: LinearLayout,
-        label: String,
-        action: () -> Unit
-    ) {
-        val button = Button(this)
-        button.text = label
-        button.textSize = 16f
-        button.isAllCaps = false
-
-        val params = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-        params.setMargins(0, 8, 0, 8)
-
-        root.addView(button, params)
-        button.setOnClickListener { action() }
-    }
-
     private fun selectVideo() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
-        intent.addCategory(Intent.CATEGORY_OPENABLE)
-        intent.type = "video/*"
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "video/*"
+        }
 
         startActivityForResult(intent, pickVideoCode)
     }
@@ -128,12 +119,65 @@ class MainActivity : Activity() {
             resultCode == RESULT_OK &&
             data?.data != null
         ) {
-            val videoUri: Uri = data.data!!
-            Toast.makeText(
-                this,
-                "ویدیو انتخاب شد؛ آمادهٔ مراحل بعدی تدوین است.",
-                Toast.LENGTH_LONG
-            ).show()
+            selectedVideoUri = data.data!!
+
+            val fileName = getFileName(selectedVideoUri!!)
+
+            statusText.text =
+                "✅ ویدیو انتخاب شد\n\nنام فایل:\n$fileName\n\nآماده برای مراحل بعدی!"
+
+            showMessage("ویدیو با موفقیت انتخاب شد.")
         }
+    }
+
+    private fun makeButton(
+        label: String,
+        action: () -> Unit
+    ): Button {
+        return Button(this).apply {
+            text = label
+            textSize = 16f
+            isAllCaps = false
+            setOnClickListener { action() }
+
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setMargins(0, 12, 0, 4)
+            }
+        }
+    }
+
+    private fun getFileName(uri: Uri): String {
+        var name = "video"
+
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val index = cursor.getColumnIndex(
+                    OpenableColumns.DISPLAY_NAME
+                )
+
+                if (index >= 0) {
+                    name = cursor.getString(index) ?: "video"
+                }
+            }
+        }
+
+        return name
+    }
+
+    private fun showMessage(message: String) {
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
     }
 }
