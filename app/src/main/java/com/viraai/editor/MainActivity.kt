@@ -12,11 +12,15 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.VideoView
+import android.widget.MediaController
 
 class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
+    private lateinit var videoView: VideoView
     private var selectedVideoUri: Uri? = null
+
     private val pickVideoCode = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,14 +32,14 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(24, 35, 24, 24)
+            setPadding(20, 25, 20, 20)
             setBackgroundColor(Color.rgb(15, 15, 25))
         }
 
         val title = TextView(this).apply {
             text = "ViraAI"
             textSize = 34f
-            setTextColor(Color.rgb(125, 100, 255))
+            setTextColor(Color.rgb(150, 125, 255))
             gravity = Gravity.CENTER
         }
 
@@ -44,21 +48,42 @@ class MainActivity : Activity() {
             textSize = 16f
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
+            setPadding(0, 0, 0, 15)
         }
 
-        statusText = TextView(this).apply {
-            text = "هنوز ویدیویی انتخاب نکرده‌ای."
-            textSize = 16f
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            setPadding(12, 25, 12, 25)
-        }
+        videoView = VideoView(this)
+
+        val mediaController = MediaController(this)
+        videoView.setMediaController(mediaController)
+        mediaController.setAnchorView(videoView)
+
+        val videoHeight = (220 * resources.displayMetrics.density).toInt()
 
         root.addView(title)
         root.addView(subtitle)
 
+        root.addView(
+            videoView,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                videoHeight
+            ).apply {
+                setMargins(0, 10, 0, 10)
+            }
+        )
+
         root.addView(makeButton("🎬 انتخاب ویدیو") {
             selectVideo()
+        })
+
+        root.addView(makeButton("✂️ ابزارهای تدوین") {
+            if (selectedVideoUri == null) {
+                showMessage("ابتدا یک ویدیو انتخاب کن.")
+            } else {
+                showMessage(
+                    "ویدیوی تو آماده است. ابزار برش را در مرحله بعد اضافه می‌کنیم."
+                )
+            }
         })
 
         root.addView(makeButton("✍️ زیرنویس خودکار") {
@@ -66,26 +91,24 @@ class MainActivity : Activity() {
                 showMessage("ابتدا یک ویدیو انتخاب کن.")
             } else {
                 showMessage(
-                    "ویدیو انتخاب شده؛ قابلیت زیرنویس خودکار را در مرحله بعد اضافه می‌کنیم."
+                    "قابلیت ساخت زیرنویس خودکار هنوز آماده نشده است."
                 )
             }
         })
 
-        root.addView(makeButton("🤖 ادیت هوشمند") {
-            if (selectedVideoUri == null) {
-                showMessage("ابتدا یک ویدیو انتخاب کن.")
-            } else {
-                showMessage(
-                    "ویدیو آماده است؛ قابلیت ادیت هوشمند را در مرحله بعد اضافه می‌کنیم."
-                )
-            }
-        })
-
-        root.addView(makeButton("📁 پروژه‌های من") {
+        root.addView(makeButton("🤖 تدوین هوشمند") {
             showMessage(
-                "قابلیت ذخیره و مدیریت پروژه‌ها را در مرحله بعد اضافه می‌کنیم."
+                "قابلیت تدوین هوشمند را در مراحل بعد اضافه می‌کنیم."
             )
         })
+
+        statusText = TextView(this).apply {
+            text = "هنوز ویدیویی انتخاب نکرده‌ای."
+            textSize = 15f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(8, 18, 8, 8)
+        }
 
         root.addView(
             statusText,
@@ -115,18 +138,30 @@ class MainActivity : Activity() {
     ) {
         super.onActivityResult(requestCode, resultCode, data)
 
-        if (requestCode == pickVideoCode &&
+        if (
+            requestCode == pickVideoCode &&
             resultCode == RESULT_OK &&
             data?.data != null
         ) {
-            selectedVideoUri = data.data!!
+            val uri = data.data!!
+            selectedVideoUri = uri
 
-            val fileName = getFileName(selectedVideoUri!!)
+            try {
+                videoView.setVideoURI(uri)
 
-            statusText.text =
-                "✅ ویدیو انتخاب شد\n\nنام فایل:\n$fileName\n\nآماده برای مراحل بعدی!"
+                videoView.setOnPreparedListener { player ->
+                    player.isLooping = false
+                    videoView.start()
+                }
 
-            showMessage("ویدیو با موفقیت انتخاب شد.")
+                statusText.text =
+                    "✅ ویدیو انتخاب شد و آماده پخش است."
+
+                showMessage("ویدیو انتخاب شد؛ در حال آماده‌سازی پخش.")
+
+            } catch (e: Exception) {
+                showMessage("پخش ویدیو با مشکل روبه‌رو شد.")
+            }
         }
     }
 
@@ -144,33 +179,9 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(0, 12, 0, 4)
+                setMargins(0, 6, 0, 6)
             }
         }
-    }
-
-    private fun getFileName(uri: Uri): String {
-        var name = "video"
-
-        contentResolver.query(
-            uri,
-            arrayOf(OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val index = cursor.getColumnIndex(
-                    OpenableColumns.DISPLAY_NAME
-                )
-
-                if (index >= 0) {
-                    name = cursor.getString(index) ?: "video"
-                }
-            }
-        }
-
-        return name
     }
 
     private fun showMessage(message: String) {
